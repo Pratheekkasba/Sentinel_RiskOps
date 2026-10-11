@@ -263,6 +263,17 @@ export default function Dashboard() {
               <p className="page-subtitle">{heading.sub}</p>
             </div>
             <div className="heading-actions">
+              <a
+                href="/checkout.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="secondary-button"
+                style={{ textDecoration: 'none' }}
+                title="Open Customer Checkout Simulator"
+              >
+                <CreditCard size={15} />
+                Checkout Store
+              </a>
               <button className="secondary-button" onClick={fetchTransactions}>
                 <RefreshCw size={15} className={isRefreshing ? 'spin' : ''} />
                 Refresh
