@@ -2,14 +2,14 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Activity, AlertTriangle, ArrowUpRight, BarChart3, Bell, Check,
   ChevronDown, CircleDollarSign, Clock3, CreditCard, FileSearch,
-  LayoutDashboard, Menu, RefreshCw, Search, Settings, ShieldCheck,
+  LayoutDashboard, LogOut, Menu, RefreshCw, Search, Settings, ShieldCheck,
   SlidersHorizontal, Sparkles, X, TrendingUp, Globe, CreditCard as CardIcon,
   Smartphone, Building2, Zap, Ban, Eye,
 } from 'lucide-react';
 import './App.css';
+import { useAuth } from './context/AuthContext.jsx';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-const ADMIN_TOKEN = import.meta.env.VITE_ADMIN_TOKEN || '';
 const PAYMENTS_API_URL = `${API_BASE_URL}/api/dashboard/payments`;
 const PAYMENTS_RESET_API_URL = PAYMENTS_API_URL;
 const BENCHMARK_API_URL = `${API_BASE_URL}/api/evaluation/benchmark`;
@@ -18,6 +18,7 @@ const BENCHMARK_API_URL = `${API_BASE_URL}/api/evaluation/benchmark`;
    ROOT DASHBOARD COMPONENT
    ═══════════════════════════════════════════════════════════════════════ */
 export default function Dashboard() {
+  const { user, logout, authHeaders } = useAuth();
   const [transactions, setTransactions] = useState([]);
   const [selectedTx, setSelectedTx] = useState(null);
   const [activeView, setActiveView] = useState('Overview');
@@ -33,7 +34,7 @@ export default function Dashboard() {
   const fetchTransactions = async () => {
     setIsRefreshing(true);
     try {
-      const res = await fetch(PAYMENTS_API_URL, { headers: { 'X-Sentinel-Admin-Token': ADMIN_TOKEN } });
+      const res = await fetch(PAYMENTS_API_URL, { headers: authHeaders() });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setTransactions(await res.json());
       setIsOffline(false);
@@ -48,7 +49,7 @@ export default function Dashboard() {
 
   const fetchBenchmark = async () => {
     try {
-      const res = await fetch(BENCHMARK_API_URL);
+      const res = await fetch(BENCHMARK_API_URL, { headers: authHeaders() });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setBenchmark(await res.json());
     } catch (err) {
@@ -98,7 +99,7 @@ export default function Dashboard() {
   const resetDashboard = async () => {
     if (!window.confirm('Reset the dashboard? This permanently deletes all payment, risk, and AI investigation data.')) return;
     try {
-      const response = await fetch(PAYMENTS_RESET_API_URL, { method: 'DELETE', headers: { 'X-Sentinel-Admin-Token': ADMIN_TOKEN } });
+      const response = await fetch(PAYMENTS_RESET_API_URL, { method: 'DELETE', headers: authHeaders() });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       setTransactions([]);
       setSelectedTx(null);
@@ -114,14 +115,14 @@ export default function Dashboard() {
     try {
       const response = await fetch(`${PAYMENTS_API_URL.replace('/payments', '')}/payments/${encodeURIComponent(tx.paymentId)}/decision`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'X-Sentinel-Admin-Token': ADMIN_TOKEN },
+        headers: authHeaders(),
         body: JSON.stringify({ action }),
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const updated = await response.json();
       setTransactions(current => current.map(payment => payment.paymentId === updated.paymentId ? updated : payment));
       setSelectedTx(null);
-      showNotice(`Payment ${tx.paymentId} ${action === 'approve' ? 'approved' : 'blocked'} by local-analyst`);
+      showNotice(`Payment ${tx.paymentId} ${action === 'approve' ? 'approved' : 'blocked'} by ${user?.email || 'analyst'}`);
     } catch (err) {
       console.error('Decision error:', err);
       showNotice(`Could not ${action} payment ${tx.paymentId}`);
@@ -167,8 +168,9 @@ export default function Dashboard() {
   };
 
   /* ── Page heading per view ── */
+  const displayName = user?.fullName?.split(' ')[0] || 'Analyst';
   const heading = {
-    Overview:     { title: `Good ${timeOfDay()}, Pratheek`, sub: 'Here is what is happening across your payment operation.' },
+    Overview:     { title: `Good ${timeOfDay()}, ${displayName}`, sub: 'Here is what is happening across your payment operation.' },
     Transactions: { title: 'Transactions', sub: 'Full live payment history from your storefront.' },
     Analytics:    { title: 'Analytics', sub: 'A foundation for deeper fraud and revenue reporting.' },
     'Review queue': { title: 'Review Queue', sub: 'Transactions flagged by Sentinel Risk Model v1 that need your attention.' },
@@ -185,10 +187,10 @@ export default function Dashboard() {
         </div>
 
         <div className="workspace-switcher">
-          <span className="workspace-avatar">S</span>
+          <span className="workspace-avatar">{user?.fullName?.[0]?.toUpperCase() || 'A'}</span>
           <span>
-            <strong>Sentinel Store</strong>
-            <small>Merchant workspace</small>
+            <strong>{user?.fullName || 'Analyst'}</strong>
+            <small>{user?.email || 'Sentinel workspace'}</small>
           </span>
           <ChevronDown size={14} />
         </div>
@@ -218,7 +220,15 @@ export default function Dashboard() {
 
         <div className="sidebar-footer">
           <div className="live-indicator"><span /> All systems operational</div>
-          <div className="version">Sentinel v0.1 · Local environment</div>
+          <div className="version">Sentinel v0.1 · {user?.role || 'ANALYST'}</div>
+          <button
+            className="signout-button"
+            onClick={logout}
+            title="Sign out"
+          >
+            <LogOut size={14} />
+            Sign out
+          </button>
         </div>
       </aside>
 
@@ -240,7 +250,7 @@ export default function Dashboard() {
               <Bell size={17} />
               {flaggedTx.length > 0 && <i />}
             </button>
-            <div className="user-avatar" aria-label="Pratheek">P</div>
+            <div className="user-avatar" aria-label={user?.fullName || 'User'} title={user?.email}>{user?.fullName?.[0]?.toUpperCase() || 'A'}</div>
           </div>
         </header>
 
@@ -1061,14 +1071,20 @@ function ActionPill({ action }) {
 }
 
 function TransactionDrawer({ tx, onClose, onApprove, onBlock }) {
+  const { authHeaders } = useAuth();
   const [auditHistory, setAuditHistory] = useState([]);
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/dashboard/payments/${encodeURIComponent(tx.paymentId)}/audit`, { headers: { 'X-Sentinel-Admin-Token': ADMIN_TOKEN } })
+    if (!tx?.paymentId) return;
+    fetch(`${API_BASE_URL}/api/dashboard/payments/${encodeURIComponent(tx.paymentId)}/audit`, {
+      headers: authHeaders(),
+    })
       .then(response => response.ok ? response.json() : [])
-      .then(setAuditHistory)
+      .then(data => setAuditHistory(Array.isArray(data) ? data : []))
       .catch(() => setAuditHistory([]));
-  }, [tx.paymentId]);
+  }, [tx?.paymentId]);
+
+  if (!tx) return null;
 
   return (
     <div className="drawer-backdrop" onClick={onClose}>
@@ -1120,10 +1136,16 @@ function TransactionDrawer({ tx, onClose, onApprove, onBlock }) {
           </div>
         )}
 
-        {auditHistory.length > 0 && (
+        {Array.isArray(auditHistory) && auditHistory.length > 0 && (
           <div className="drawer-section">
             <h3>Audit history</h3>
-            {auditHistory.map(entry => <Detail key={entry.id} label={entry.action} value={`${entry.analystId} · ${formatTime(entry.createdAt)}`} />)}
+            {auditHistory.map(entry => (
+              <Detail
+                key={entry.id || `${entry.action}-${entry.createdAt}`}
+                label={entry.action}
+                value={`${entry.analystId || 'analyst'} · ${formatTime(entry.createdAt)}`}
+              />
+            ))}
           </div>
         )}
 
@@ -1299,8 +1321,13 @@ function sumPaise(transactions) {
 }
 
 function toPaise(amount) {
-  const value = String(amount ?? 0).trim();
-  return BigInt(value.split('.')[0] || '0');
+  try {
+    const value = String(amount ?? 0).trim().split('.')[0];
+    const clean = value.replace(/[^\d-]/g, '') || '0';
+    return BigInt(clean);
+  } catch {
+    return 0n;
+  }
 }
 
 function formatIndianInteger(value) {

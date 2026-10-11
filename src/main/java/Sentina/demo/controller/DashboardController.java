@@ -1,15 +1,17 @@
 package Sentina.demo.controller;
 
-import Sentina.demo.models.Payment;
 import Sentina.demo.models.AuditAction;
+import Sentina.demo.models.Payment;
+import Sentina.demo.models.User;
 import Sentina.demo.repository.InvestigationRepository;
 import Sentina.demo.repository.PaymentRepository;
 import Sentina.demo.repository.RiskEvaluationRepository;
 import Sentina.demo.repository.AuditActionRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.util.List;
 import java.util.Map;
@@ -25,10 +27,6 @@ public class DashboardController {
     private final RiskEvaluationRepository riskEvaluationRepository;
     private final InvestigationRepository investigationRepository;
     private final AuditActionRepository auditActionRepository;
-    @Value("${sentinel.auth.enabled:false}")
-    private boolean authEnabled;
-    @Value("${sentinel.auth.admin-token:change-me}")
-    private String adminToken;
 
     public DashboardController(PaymentRepository paymentRepository,
                                RiskEvaluationRepository riskEvaluationRepository,
@@ -41,21 +39,25 @@ public class DashboardController {
     }
 
     @GetMapping("/payments")
-    public ResponseEntity<?> getAllPayments(@RequestHeader(value = "X-Sentinel-Admin-Token", defaultValue = "") String token) {
-        if (!authorized(token)) return ResponseEntity.status(401).body("Authentication required");
+    @PreAuthorize("hasAnyRole('ANALYST', 'ADMIN')")
+    public ResponseEntity<?> getAllPayments() {
         return ResponseEntity.ok(paymentRepository.findAll());
     }
 
     @PatchMapping("/payments/{paymentId}/decision")
-    public ResponseEntity<?> decidePayment(@PathVariable String paymentId,
-                                            @RequestBody Map<String, String> decision,
-                                            @RequestHeader(value = "X-Analyst-Id", defaultValue = "local-analyst") String analystId,
-                                            @RequestHeader(value = "X-Sentinel-Admin-Token", defaultValue = "") String token) {
-        if (!authorized(token)) return ResponseEntity.status(401).body("Authentication required");
+    @PreAuthorize("hasAnyRole('ANALYST', 'ADMIN')")
+    public ResponseEntity<?> decidePayment(
+            @PathVariable String paymentId,
+            @RequestBody Map<String, String> decision,
+            @AuthenticationPrincipal User currentUser) {
+
         String action = decision.get("action");
         if (!"approve".equals(action) && !"block".equals(action)) {
             return ResponseEntity.badRequest().body("Decision must be approve or block");
         }
+
+        // Use the authenticated user's email as the analyst identifier
+        String analystId = currentUser != null ? currentUser.getEmail() : "unknown";
 
         return paymentRepository.findById(paymentId)
                 .map(payment -> {
@@ -68,24 +70,19 @@ public class DashboardController {
     }
 
     @GetMapping("/payments/{paymentId}/audit")
-    public ResponseEntity<?> getAuditHistory(@PathVariable String paymentId,
-                                             @RequestHeader(value = "X-Sentinel-Admin-Token", defaultValue = "") String token) {
-        if (!authorized(token)) return ResponseEntity.status(401).body("Authentication required");
+    @PreAuthorize("hasAnyRole('ANALYST', 'ADMIN')")
+    public ResponseEntity<?> getAuditHistory(@PathVariable String paymentId) {
         return ResponseEntity.ok(auditActionRepository.findByPaymentIdOrderByCreatedAtDesc(paymentId));
     }
 
     @DeleteMapping("/payments")
     @Transactional
-    public ResponseEntity<?> resetDashboard(@RequestHeader(value = "X-Sentinel-Admin-Token", defaultValue = "") String token) {
-        if (!authorized(token)) return ResponseEntity.status(401).body("Authentication required");
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> resetDashboard() {
         investigationRepository.deleteAllInBatch();
         riskEvaluationRepository.deleteAllInBatch();
         auditActionRepository.deleteAllInBatch();
         paymentRepository.deleteAllInBatch();
         return ResponseEntity.ok(Map.of("status", "RESET"));
-    }
-
-    private boolean authorized(String token) {
-        return !authEnabled || adminToken.equals(token);
     }
 }
