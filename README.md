@@ -8,11 +8,11 @@
 
 | Layer | Platform | Live URL / Status |
 |---|---|---|
-| **Frontend Dashboard** | **Vercel** | `https://<your-project>.vercel.app` |
-| **Customer Storefront** | **Vercel** | `https://<your-project>.vercel.app/checkout.html` |
-| **Backend API** | **Render (Docker)** | `https://sentinel-riskops.onrender.com` |
+| **Frontend Dashboard** | **Vercel** | [https://sentinel-risk-ops.vercel.app](https://sentinel-risk-ops.vercel.app) |
+| **Customer Storefront** | **Vercel** | [https://sentinel-risk-ops.vercel.app/checkout.html](https://sentinel-risk-ops.vercel.app/checkout.html) |
+| **Backend API** | **Render (Docker)** | [https://sentinel-riskops.onrender.com](https://sentinel-riskops.onrender.com) |
 | **Database** | **TiDB Cloud (Serverless)** | AWS Tokyo MySQL Cluster (`sentinel_riskops`) |
-| **Health Monitor** | **UptimeRobot** | `https://sentinel-riskops.onrender.com/api/health` (Status: **UP 🟢**) |
+| **Health Monitor** | **UptimeRobot** | [https://sentinel-riskops.onrender.com/api/health](https://sentinel-riskops.onrender.com/api/health) (Status: **UP 🟢**) |
 
 ---
 
