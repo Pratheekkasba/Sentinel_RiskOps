@@ -44,6 +44,8 @@ public class SecurityConfig {
 
             // ── Route rules ──────────────────────────────────────────────────
             .authorizeHttpRequests(auth -> auth
+                // Public: health check endpoint for UptimeRobot / pingers
+                .requestMatchers("/", "/api/health").permitAll()
                 // Public: auth endpoints
                 .requestMatchers("/api/auth/**").permitAll()
                 // Public: Razorpay webhooks (use their own HMAC verification)
