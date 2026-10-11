@@ -1,6 +1,7 @@
 package Sentina.demo.controller;
 
 import Sentina.demo.models.Payment;
+import Sentina.demo.models.User;
 import Sentina.demo.repository.AuditActionRepository;
 import Sentina.demo.repository.InvestigationRepository;
 import Sentina.demo.repository.PaymentRepository;
@@ -24,7 +25,7 @@ class DashboardControllerTest {
         AuditActionRepository audits = mock(AuditActionRepository.class);
         DashboardController controller = new DashboardController(payments, risks, investigations, audits);
 
-        ResponseEntity<?> response = controller.resetDashboard("");
+        ResponseEntity<?> response = controller.resetDashboard();
 
         assertEquals(200, response.getStatusCode().value());
         verify(investigations).deleteAllInBatch();
@@ -42,7 +43,10 @@ class DashboardControllerTest {
         when(payments.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
         DashboardController controller = new DashboardController(payments, mock(RiskEvaluationRepository.class), mock(InvestigationRepository.class), mock(AuditActionRepository.class));
 
-        ResponseEntity<?> response = controller.decidePayment("pay_1", Map.of("action", "block"), "analyst-7", "");
+        User user = new User();
+        user.setEmail("analyst@example.com");
+
+        ResponseEntity<?> response = controller.decidePayment("pay_1", Map.of("action", "block"), user);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals("blocked", payment.getStatus());
