@@ -17,4 +17,12 @@ public interface PaymentRepository extends JpaRepository<Payment, String> {
     long countByIpAddressAndCreatedAtAfter(String ipAddress, LocalDateTime timeWindow);
 
     List<Payment> findByGroundTruthFraudNotNull();
+
+    List<Payment> findAllByOrderByCreatedAtDesc();
+
+    List<Payment> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    List<Payment> findByUserId(Long userId);
+
+    List<Payment> findByUserIdIsNull();
 }

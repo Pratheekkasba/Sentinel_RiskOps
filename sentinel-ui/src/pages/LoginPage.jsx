@@ -8,6 +8,7 @@ export default function LoginPage() {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [role, setRole]         = useState('ANALYST');
   const [showPw, setShowPw]     = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError]       = useState('');
@@ -25,7 +26,7 @@ export default function LoginPage() {
           setIsLoading(false);
           return;
         }
-        await register(email, password, fullName, 'ANALYST');
+        await register(email, password, fullName, role);
       }
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
@@ -40,6 +41,7 @@ export default function LoginPage() {
     setEmail('');
     setPassword('');
     setFullName('');
+    setRole('ANALYST');
   };
 
   return (
@@ -85,20 +87,47 @@ export default function LoginPage() {
 
           {/* Full name — register only */}
           {mode === 'register' && (
-            <div className="login-field">
-              <label htmlFor="fullName">Full name</label>
-              <div className="login-input-wrap">
-                <input
-                  id="fullName"
-                  type="text"
-                  placeholder="Pratheek Sharma"
-                  value={fullName}
-                  onChange={e => setFullName(e.target.value)}
-                  autoComplete="name"
-                  required
-                />
+            <>
+              <div className="login-field">
+                <label htmlFor="fullName">Full name</label>
+                <div className="login-input-wrap">
+                  <input
+                    id="fullName"
+                    type="text"
+                    placeholder="Pratheek Sharma"
+                    value={fullName}
+                    onChange={e => setFullName(e.target.value)}
+                    autoComplete="name"
+                    required
+                  />
+                </div>
               </div>
-            </div>
+
+              <div className="login-field">
+                <label htmlFor="role">Workspace Role</label>
+                <div className="login-input-wrap">
+                  <select
+                    id="role"
+                    value={role}
+                    onChange={e => setRole(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '10px',
+                      color: '#fff',
+                      fontSize: '14px',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="ANALYST" style={{ background: '#0f172a', color: '#fff' }}>Risk Analyst (Isolated Dashboard)</option>
+                    <option value="ADMIN" style={{ background: '#0f172a', color: '#fff' }}>Administrator (Full Access & Global Reset)</option>
+                  </select>
+                </div>
+              </div>
+            </>
           )}
 
           {/* Email */}

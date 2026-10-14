@@ -96,14 +96,20 @@ export default function Dashboard() {
   const selectView = (view) => { setActiveView(view); setMobileNavOpen(false); };
   const showNotice = (msg) => { setNotice(msg); setTimeout(() => setNotice(''), 4000); };
 
-  const resetDashboard = async () => {
-    if (!window.confirm('Reset the dashboard? This permanently deletes all payment, risk, and AI investigation data.')) return;
+  const resetDashboard = async (all = false) => {
+    const confirmMsg = all
+      ? 'Reset the entire system? This permanently deletes all payments across all users.'
+      : 'Reset your dashboard data? This will clear your transactions and investigations.';
+    if (!window.confirm(confirmMsg)) return;
     try {
-      const response = await fetch(PAYMENTS_RESET_API_URL, { method: 'DELETE', headers: authHeaders() });
+      const url = all ? `${PAYMENTS_RESET_API_URL}?all=true` : PAYMENTS_RESET_API_URL;
+      const response = await fetch(url, { method: 'DELETE', headers: authHeaders() });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       setTransactions([]);
       setSelectedTx(null);
-      showNotice('Dashboard reset successfully');
+      showNotice(all ? 'System data reset successfully' : 'Dashboard reset successfully');
+      fetchTransactions();
+      fetchBenchmark();
     } catch (err) {
       console.error('Reset error:', err);
       showNotice('Could not reset the dashboard');
@@ -145,7 +151,7 @@ export default function Dashboard() {
       case 'Review queue':
         return <ReviewQueueView flaggedTx={flaggedTx} onSelect={setSelectedTx} onApprove={handleApprove} onBlock={handleBlock} onNavigate={selectView} />;
       case 'Settings':
-        return <SettingsPanel notificationsEnabled={notificationsEnabled} onToggleNotifications={() => setNotificationsEnabled(p => !p)} onReset={resetDashboard} />;
+        return <SettingsPanel user={user} notificationsEnabled={notificationsEnabled} onToggleNotifications={() => setNotificationsEnabled(p => !p)} onReset={resetDashboard} />;
       default:
         return (
           <OverviewView
@@ -264,7 +270,7 @@ export default function Dashboard() {
             </div>
             <div className="heading-actions">
               <a
-                href="/checkout.html"
+                href={`/checkout.html?userId=${encodeURIComponent(user?.userId || '')}&userEmail=${encodeURIComponent(user?.email || '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="secondary-button"
@@ -1185,7 +1191,7 @@ function Detail({ label, value, mono }) {
   );
 }
 
-function SettingsPanel({ notificationsEnabled, onToggleNotifications, onReset }) {
+function SettingsPanel({ user, notificationsEnabled, onToggleNotifications, onReset }) {
   return (
     <div className="single-panel panel">
       <PanelHeader title="Workspace settings" subtitle="Manage how Sentinel connects to your payment operation" />
@@ -1230,10 +1236,20 @@ function SettingsPanel({ notificationsEnabled, onToggleNotifications, onReset })
           <div className="setting-icon"><X size={17} /></div>
           <span>
             <strong>Reset dashboard data</strong>
-            <small>Delete all payments, risk evaluations, and AI investigations</small>
+            <small>Clear all payments, risk evaluations, and AI investigations for your account</small>
           </span>
-          <button className="danger-button" onClick={onReset}>Reset data</button>
+          <button className="danger-button" onClick={() => onReset(false)}>Reset my data</button>
         </div>
+        {user?.role === 'ADMIN' && (
+          <div>
+            <div className="setting-icon" style={{ color: '#ef4444' }}><Ban size={17} /></div>
+            <span>
+              <strong>Global system reset (Admin)</strong>
+              <small>Permanently wipe all payments, evaluations, and audit records across the entire database</small>
+            </span>
+            <button className="danger-button" style={{ background: '#b91c1c' }} onClick={() => onReset(true)}>Reset all system data</button>
+          </div>
+        )}
       </div>
     </div>
   );

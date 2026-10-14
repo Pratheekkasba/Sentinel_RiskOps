@@ -31,6 +31,7 @@ public class WebhookController {
     private final RiskEngineService riskEngineService;
     private final AiInvestigatorService aiInvestigatorService;
     private final ObjectMapper objectMapper;
+    private final Sentina.demo.repository.UserRepository userRepository;
     private final boolean signatureEnabled;
     private final String webhookSecret;
 
@@ -38,12 +39,14 @@ public class WebhookController {
                              RiskEngineService riskEngineService,
                              AiInvestigatorService aiInvestigatorService,
                              ObjectMapper objectMapper,
+                             Sentina.demo.repository.UserRepository userRepository,
                              @Value("${sentinel.webhook.signature.enabled:false}") boolean signatureEnabled,
                              @Value("${sentinel.webhook.secret:change-me}") String webhookSecret) {
         this.paymentRepository = paymentRepository;
         this.riskEngineService = riskEngineService;
         this.aiInvestigatorService = aiInvestigatorService;
         this.objectMapper = objectMapper;
+        this.userRepository = userRepository;
         this.signatureEnabled = signatureEnabled;
         this.webhookSecret = webhookSecret;
     }
@@ -120,6 +123,27 @@ public class WebhookController {
                 payment.setCustomerId((String) paymentEntity.get("email"));
                 if (paymentEntity.containsKey("is_fraud")) {
                     payment.setGroundTruthFraud((Boolean) paymentEntity.get("is_fraud"));
+                }
+
+                // Associate payment with user if provided in entity or notes
+                Object userIdObj = paymentEntity.get("user_id");
+                Object userEmailObj = paymentEntity.get("user_email");
+                if (paymentEntity.get("notes") instanceof Map<?, ?> notes) {
+                    if (userIdObj == null) userIdObj = notes.get("userId");
+                    if (userIdObj == null) userIdObj = notes.get("user_id");
+                    if (userEmailObj == null) userEmailObj = notes.get("userEmail");
+                    if (userEmailObj == null) userEmailObj = notes.get("user_email");
+                }
+                if (userIdObj != null && !userIdObj.toString().isBlank() && !"null".equalsIgnoreCase(userIdObj.toString())) {
+                    try {
+                        payment.setUserId(Long.valueOf(userIdObj.toString()));
+                    } catch (NumberFormatException ignored) {}
+                }
+                if (userEmailObj != null && !userEmailObj.toString().isBlank() && !"null".equalsIgnoreCase(userEmailObj.toString())) {
+                    payment.setUserEmail(userEmailObj.toString().trim());
+                    if (payment.getUserId() == null) {
+                        userRepository.findByEmail(payment.getUserEmail()).ifPresent(u -> payment.setUserId(u.getId()));
+                    }
                 }
 
                 payment.setIpAddress(resolveClientIp(request));

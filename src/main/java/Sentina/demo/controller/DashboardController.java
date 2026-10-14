@@ -40,8 +40,18 @@ public class DashboardController {
 
     @GetMapping("/payments")
     @PreAuthorize("hasAnyRole('ANALYST', 'ADMIN')")
-    public ResponseEntity<?> getAllPayments() {
-        return ResponseEntity.ok(paymentRepository.findAll());
+    public ResponseEntity<?> getAllPayments(
+            @AuthenticationPrincipal User currentUser,
+            @RequestParam(required = false, defaultValue = "false") boolean all) {
+        if (currentUser == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+
+        if (currentUser.getRole() == User.Role.ADMIN || all) {
+            return ResponseEntity.ok(paymentRepository.findAllByOrderByCreatedAtDesc());
+        }
+
+        return ResponseEntity.ok(paymentRepository.findByUserIdOrderByCreatedAtDesc(currentUser.getId()));
     }
 
     @PatchMapping("/payments/{paymentId}/decision")
@@ -77,12 +87,41 @@ public class DashboardController {
 
     @DeleteMapping("/payments")
     @Transactional
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> resetDashboard() {
-        investigationRepository.deleteAllInBatch();
-        riskEvaluationRepository.deleteAllInBatch();
-        auditActionRepository.deleteAllInBatch();
-        paymentRepository.deleteAllInBatch();
-        return ResponseEntity.ok(Map.of("status", "RESET"));
+    @PreAuthorize("hasAnyRole('ANALYST', 'ADMIN')")
+    public ResponseEntity<?> resetDashboard(
+            @AuthenticationPrincipal User currentUser,
+            @RequestParam(required = false, defaultValue = "false") boolean all) {
+
+        if (currentUser == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+
+        if (currentUser.getRole() == User.Role.ADMIN || all) {
+            investigationRepository.deleteAllInBatch();
+            riskEvaluationRepository.deleteAllInBatch();
+            auditActionRepository.deleteAllInBatch();
+            paymentRepository.deleteAllInBatch();
+            return ResponseEntity.ok(Map.of("status", "RESET", "scope", "ALL"));
+        }
+
+        List<Payment> userPayments = paymentRepository.findByUserId(currentUser.getId());
+        if (!userPayments.isEmpty()) {
+            List<String> paymentIds = userPayments.stream().map(Payment::getPaymentId).toList();
+            investigationRepository.deleteByPaymentIdIn(paymentIds);
+            riskEvaluationRepository.deleteByPaymentIdIn(paymentIds);
+            auditActionRepository.deleteByPaymentIdIn(paymentIds);
+            paymentRepository.deleteAllInBatch(userPayments);
+        }
+
+        List<Payment> unassigned = paymentRepository.findByUserIdIsNull();
+        if (!unassigned.isEmpty()) {
+            List<String> unassignedIds = unassigned.stream().map(Payment::getPaymentId).toList();
+            investigationRepository.deleteByPaymentIdIn(unassignedIds);
+            riskEvaluationRepository.deleteByPaymentIdIn(unassignedIds);
+            auditActionRepository.deleteByPaymentIdIn(unassignedIds);
+            paymentRepository.deleteAllInBatch(unassigned);
+        }
+
+        return ResponseEntity.ok(Map.of("status", "RESET", "scope", "USER"));
     }
 }

@@ -40,10 +40,21 @@ public class Payment {
     @Column(name = "is_fraud")
     private Boolean groundTruthFraud;
 
+    @Column(name = "user_id")
+    private Long userId;
+
+    @Column(name = "user_email")
+    private String userEmail;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
     // Getters and Setters
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+
+    public String getUserEmail() { return userEmail; }
+    public void setUserEmail(String userEmail) { this.userEmail = userEmail; }
     public String getPaymentId() { return paymentId; }
     public void setPaymentId(String paymentId) { this.paymentId = paymentId; }
 
